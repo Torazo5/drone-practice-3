@@ -1,15 +1,8 @@
-from ultralytics import YOLO
+from djitellopy import tello
 import cv2
-import math 
-# start webcam
-cap = cv2.VideoCapture(0)
-cap.set(3, 640)
-cap.set(4, 480)
+import math
+from ultralytics import YOLO  # Make sure to import YOLO from Ultralytics
 
-# model
-model = YOLO("yolo-Weights/yolov8n.pt")
-
-# object classes
 classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat",
               "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
               "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
@@ -22,26 +15,36 @@ classNames = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "trai
               "teddy bear", "hair drier", "toothbrush"
               ]
 
+# Initialize Tello drone
+drone = tello.Tello()
+drone.connect()
+drone.streamon()
+print(f'BATTERY: {drone.get_battery}')
+# Initialize YOLO model
+model = YOLO("yolo-Weights/yolov8n.pt")
 
 while True:
-    success, img = cap.read()
-    results = model(img, stream=True)
+    # Get frame from Tello camera
+    frame = drone.get_frame_read().frame
 
-    # coordinates
+    # Perform object detection with YOLO model
+    results = model(frame, stream=True)
+
+    # Rest of the code remains the same
     for r in results:
         boxes = r.boxes
 
         for box in boxes:
             # bounding box
             x1, y1, x2, y2 = box.xyxy[0]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2) # convert to int values
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
             # put box in cam
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 255), 3)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
 
             # confidence
-            confidence = math.ceil((box.conf[0]*100))/100
-            print("Confidence --->",confidence)
+            confidence = math.ceil((box.conf[0] * 100)) / 100
+            print("Confidence --->", confidence)
 
             # class name
             cls = int(box.cls[0])
@@ -54,11 +57,12 @@ while True:
             color = (255, 0, 0)
             thickness = 2
 
-            cv2.putText(img, classNames[cls], org, font, fontScale, color, thickness)
+            cv2.putText(frame, classNames[cls], org, font, fontScale, color, thickness)
 
-    cv2.imshow('Webcam', img)
+    cv2.imshow('Tello Camera', frame)
     if cv2.waitKey(1) == ord('q'):
         break
 
-cap.release()
+# Land the Tello drone
+drone.land()
 cv2.destroyAllWindows()
